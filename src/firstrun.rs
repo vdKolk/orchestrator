@@ -575,7 +575,20 @@ impl Outcome {
 /// one it is served on, for the Host and Origin checks in [`guard`].
 pub fn router(host: Arc<dyn BootstrapHost>, port: u16) -> Router {
     Router::new()
-        .route("/", get(|| async { Html(include_str!("firstrun.html")) }))
+        /* Substituted rather than served flat, for the same reason the board is
+           ([`crate::window::Chrome`]): this page draws window controls, and which
+           ones are its to draw is the *window's* answer, not something a page may
+           sniff out of a user agent. A `String` per request is nothing — the page
+           is fetched once per open. */
+        .route(
+            "/",
+            get(|| async {
+                Html(
+                    include_str!("firstrun.html")
+                        .replace("__ORCH_CHROME__", crate::window::Chrome::DESKTOP.as_str()),
+                )
+            }),
+        )
         .route("/api/context", get(context_route))
         .route("/api/recent", get(|| async { Json(recent_projects()) }))
         .route("/api/validate", post(validate_route))
@@ -1347,5 +1360,41 @@ mod tests {
         assert_eq!(picked["ok"], true);
         assert_eq!(picked["name"], "proj");
         let _ = std::fs::remove_dir_all(&base);
+    }
+
+    /// The page draws window controls, so it has to be *told* which are its to
+    /// draw — and an unsubstituted placeholder is the silent failure, because
+    /// `data-chrome="__ORCH_CHROME__"` matches no rule and the page then behaves
+    /// like the frameless one it was written as. That is what shipped: on a Mac it
+    /// drew its own three buttons while the real traffic lights sat on its title.
+    #[tokio::test]
+    async fn the_first_run_page_is_told_which_chrome_to_draw() {
+        let res = router(stub(), PORT)
+            .oneshot(
+                Request::builder()
+                    .uri("/")
+                    .header("host", format!("127.0.0.1:{PORT}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let bytes = to_bytes(res.into_body(), 1 << 20).await.unwrap();
+        let page = String::from_utf8(bytes.to_vec()).unwrap();
+
+        assert!(!page.contains("__ORCH_CHROME__"), "the placeholder was served raw");
+        assert!(
+            page.contains(&format!(
+                "data-chrome=\"{}\"",
+                crate::window::Chrome::DESKTOP.as_str()
+            )),
+            "the page must carry this platform's chrome"
+        );
+        // And the arm that pays for it: without this rule the overlay case reads
+        // as the frameless one, which is the whole bug.
+        assert!(
+            page.contains("body[data-chrome=\"overlay\"] .titlebar"),
+            "the overlay inset must still be in the stylesheet"
+        );
     }
 }

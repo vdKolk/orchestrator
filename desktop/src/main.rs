@@ -78,11 +78,10 @@ const HANDOFF_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
 
 /// macOS keeps its real traffic lights over a transparent titlebar; everywhere
 /// else the window is frameless and the SPA draws its own controls.
-const CHROME: Chrome = if cfg!(target_os = "macos") {
-    Chrome::Overlay
-} else {
-    Chrome::Custom
-};
+///
+/// The choice itself lives on [`Chrome::DESKTOP`], because the first-run page is
+/// served by the lib and needs the same answer this builder acts on.
+const CHROME: Chrome = Chrome::DESKTOP;
 
 /// WSLg's virtual GPU mis-renders WebKitGTK's accelerated compositing layers as
 /// stray white tiles — a white box on top of the UI, and white smears left

@@ -85,6 +85,21 @@ pub enum Chrome {
 }
 
 impl Chrome {
+    /// What a desktop window gets on this platform.
+    ///
+    /// One spelling, because two kinds of thing read it and they have to agree:
+    /// the window builder, which asks the OS for an overlay titlebar or for no
+    /// frame at all, and the *pages* — the board and the first-run bootstrap —
+    /// which draw whatever the OS did not. They disagreed for a release: the
+    /// first-run page was written for `Custom` alone, so on a Mac it drew its own
+    /// three buttons at the right while the real traffic lights landed on top of
+    /// the word "Orchestrator" at the left.
+    pub const DESKTOP: Chrome = if cfg!(target_os = "macos") {
+        Chrome::Overlay
+    } else {
+        Chrome::Custom
+    };
+
     pub fn as_str(self) -> &'static str {
         match self {
             Chrome::None => "none",

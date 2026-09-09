@@ -32,6 +32,16 @@
   .wctl button{width:38px;height:38px;display:flex;align-items:center;justify-content:center;color:var(--ghost)}
   .wctl button:hover{background:var(--raised);color:var(--text)}
   .wctl button.close:hover{background:#C9615A;color:#fff}
+  /* macOS draws the *real* traffic lights over this titlebar, which is what
+     `Chrome::Overlay` means — so the title has to start clear of them, and our
+     own buttons and resize strips are the window's job rather than ours. Without
+     this the lights sat on top of the word "Orchestrator" and the page offered a
+     second close button beside them. Mirrors `body[data-chrome="overlay"]` in
+     `app.css`; 86px is three buttons at 20px pitch from a 16px inset, plus
+     breathing space. */
+  body[data-chrome="overlay"] .titlebar{padding-left:86px}
+  body[data-chrome="overlay"] .wctl,
+  body[data-chrome="overlay"] .rz{display:none}
   .rz{position:fixed;z-index:6}
   .rz.n{top:0;left:8px;right:8px;height:5px;cursor:ns-resize}
   .rz.s{bottom:0;left:8px;right:8px;height:5px;cursor:ns-resize}
@@ -155,7 +165,7 @@
   .starting .st{font-family:var(--mono);font-size:11.5px;color:var(--ghost)}
 </style>
 </head>
-<body>
+<body data-chrome="__ORCH_CHROME__">
   <div class="titlebar">
     <span class="tb-title">Orchestrator</span>
     <div class="tb-drag" id="drag"></div>
@@ -264,14 +274,58 @@
     body: body ? JSON.stringify(body) : undefined,
   });
 
-  // --- window chrome (frameless) ---
-  for (const b of document.querySelectorAll('.wctl button')) {
-    b.addEventListener('click', () => post('/api/window/' + b.dataset.cmd));
+  // --- window chrome ---
+  const CHROME = document.body.dataset.chrome;
+
+  /* **The drag is ours on macOS too, and that is not obvious.** `Chrome::Overlay`
+     means the real titlebar is showing through, so it is tempting to leave the
+     dragging to AppKit — but this page covers that strip with its own opaque
+     `.titlebar`, so every press there lands in the webview and the window stops
+     moving altogether. The board keeps its own drag for exactly this reason. Only
+     the *buttons* and the resize edges are genuinely the OS's here. */
+  if (CHROME !== 'none') {
+    /* **A press is not a drag until the pointer moves, and on macOS asking too
+       early aborts the process.** `start-drag` reaches tao's `drag_window`, which
+       hands AppKit whatever event is current by the time the posted message is
+       drained — so a request still queued when the next real event arrives is
+       handed *that*: press the titlebar, press a key, and a keyDown reaches a call
+       that accepts nothing but a mouse event. The Objective-C exception takes the
+       daemon and every session with it. Waiting for movement means the request is
+       only ever sent mid-gesture, with the button down and AppKit dispatching
+       mouse events. `web/app.js` carries the same guard and the same reasoning. */
+    const DRAG_SLOP = 3;
+    $('drag').addEventListener('mousedown', (e) => {
+      if (e.button !== 0 || e.detail > 1) return;
+      const from = { x: e.clientX, y: e.clientY };
+      const stop = () => {
+        window.removeEventListener('mousemove', moved);
+        window.removeEventListener('mouseup', stop);
+        // The native drag takes the mouse, so no `mouseup` is coming once it
+        // starts; losing focus is what says the gesture left the page.
+        window.removeEventListener('blur', stop);
+      };
+      const moved = (m) => {
+        if (Math.abs(m.clientX - from.x) + Math.abs(m.clientY - from.y) < DRAG_SLOP) return;
+        stop();
+        post('/api/window/start-drag');
+      };
+      window.addEventListener('mousemove', moved);
+      window.addEventListener('mouseup', stop);
+      window.addEventListener('blur', stop);
+    });
+    $('drag').addEventListener('dblclick', () => post('/api/window/toggle-maximize'));
   }
-  $('drag').addEventListener('mousedown', (e) => { if (e.button === 0) post('/api/window/start-drag'); });
-  $('drag').addEventListener('dblclick', () => post('/api/window/toggle-maximize'));
-  for (const rz of document.querySelectorAll('.rz')) {
-    rz.addEventListener('mousedown', (e) => { if (e.button === 0) post('/api/window/resize/' + rz.dataset.edge); });
+
+  // Frameless only: on macOS these are the real traffic lights and the real
+  // window frame, and a second set drawn over them is what put this page's own
+  // close button beside them.
+  if (CHROME === 'custom') {
+    for (const b of document.querySelectorAll('.wctl button')) {
+      b.addEventListener('click', () => post('/api/window/' + b.dataset.cmd));
+    }
+    for (const rz of document.querySelectorAll('.rz')) {
+      rz.addEventListener('mousedown', (e) => { if (e.button === 0) post('/api/window/resize/' + rz.dataset.edge); });
+    }
   }
 
   // --- screens ---
