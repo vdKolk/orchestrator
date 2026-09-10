@@ -5,6 +5,17 @@ import { ctl, $, FONTS, OPACITY, PRESETS, TRANSPARENT, WHEEL, ZOOM, call, caret,
 
 const settingsOpen = () => !$('settings').hidden;
 
+/** An argv as one line somebody can edit, and `argv` can read back.
+ *
+ *  **Quotes anything with whitespace in it**, which is the half that was missing:
+ *  the box joined an argv with spaces and the save split it on them, so the one
+ *  path that always has a space on macOS — `~/Library/Application Support/orchd/
+ *  reviews.js` — came apart into two arguments on the first save. */
+const showArgv = (list) =>
+  (list || [])
+    .map((a) => (/[\s"']/.test(a) ? `"${String(a).replace(/"/g, '')}"` : a))
+    .join(' ');
+
 function closeSettings() {
   $('settings').hidden = true;
   $('gearbtn').setAttribute('aria-expanded', 'false');
@@ -157,8 +168,10 @@ async function loadConfigInto() {
     : 'none';
   ctl('setupref').value = cfg.upstream_ref || '';
   ctl('setupremote').value = cfg.upstream_remote || '';
-  ctl('setreviews').value = (cfg.reviews_command || []).join(' ');
-  ctl('setwtsetup').value = (cfg.worktree_setup || []).join(' ');
+  ctl('setreviews').value = showArgv(cfg.reviews_command);
+  // Same round trip, same reason: a repo whose setup script lives under a path
+  // with a space would come apart on the first save too.
+  ctl('setwtsetup').value = showArgv(cfg.worktree_setup);
   // Numbers go in as numbers: `value = 0` on a number input renders "0", which is
   // the setting being off said out loud, where '' would read as unset.
   ctl('setretain').value = String(cfg.worktree_retention_days ?? 0);
@@ -262,7 +275,41 @@ function renderProcs() {
 }
 
 async function saveSettings() {
-  const argv = (s) => (s.trim() ? s.trim().split(/\s+/) : []);
+  /* **Quote-aware, because the default value contains a space on every Mac.**
+     `reviews_command` defaults to `<config dir>/reviews.js`, and the config dir is
+     `~/Library/Application Support/orchd` there — so a plain `split(/\s+/)` turned
+     one path into `["…/Library/Application", "Support/orchd/reviews.js"]` and the
+     review queue read as unavailable from then on. Pressing Save without editing
+     anything was enough, so it broke on the *first* save on any Mac. Found in a
+     real config after a save; `showSettings`'s `join` is the other half.
+
+     Deliberately small: single and double quotes, no escapes, no variables. This
+     is a command line a person types into a box, and `orchd` runs it through
+     `proc::run_bounded` with an argv rather than a shell — so anything a shell
+     would do beyond grouping would be a promise this cannot keep. */
+  const argv = (s) => {
+    const out = [];
+    let cur = '';
+    let quote = '';
+    let has = false;
+    for (const ch of s.trim()) {
+      if (quote) {
+        if (ch === quote) quote = '';
+        else cur += ch;
+      } else if (ch === '"' || ch === "'") {
+        quote = ch;
+        has = true;            // `""` is a real, empty argument
+      } else if (/\s/.test(ch)) {
+        if (cur || has) out.push(cur);
+        cur = '';
+        has = false;
+      } else {
+        cur += ch;
+      }
+    }
+    if (cur || has) out.push(cur);
+    return out;
+  };
   const list = (s) => s.split(',').map((x) => x.trim()).filter(Boolean);
   const body = {
     default_language: ctl('setlang').value.trim(),
