@@ -1,7 +1,7 @@
 // The settings panel. The zoom control it offers lives in core, because the
 // terminals read the scale too.
 
-import { ctl, $, FONTS, OPACITY, PRESETS, TRANSPARENT, WHEEL, ZOOM, call, caret, clampOpacity, closeLegend, el, get, MOD_LABEL, saveWheel, saveZoom, setTheme, setWheel, setZoom, snap, theme, wheelScale, zoomScale } from './core.js';
+import { ctl, $, FONTS, OPACITY, PRESETS, TRANSPARENT, WHEEL, ZOOM, call, callShell, caret, clampOpacity, closeLegend, el, get, MOD_LABEL, saveWheel, saveZoom, setTheme, setWheel, setZoom, snap, theme, wheelScale, zoomScale } from './core.js';
 
 const settingsOpen = () => !$('settings').hidden;
 
@@ -348,7 +348,7 @@ async function saveSettings() {
      live ones back with `--resume`. */
   $('setnote').textContent = 'saved, restarting\u2026';
   try {
-    await call('/api/window/restart');
+    await callShell('/api/window/restart');
   } catch (e) {
     // A browser tab has no window to restart, and the daemon says so. Then the
     // old sentence is the right one: it is saved, and it applies when you restart

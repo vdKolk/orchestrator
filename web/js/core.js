@@ -158,6 +158,27 @@ export const checkouts = (window.__ORCH__.checkouts || []).length
 
 export const repoById = (id) => checkouts.find((r) => r.id === id) || checkouts[0];
 
+/** The repository whose daemon served this page — the one holding the shell.
+ *
+ *  Identified by having no origin of its own (see the registry above), which is
+ *  the same thing as being same-origin with this document. */
+export const localRepo = checkouts.find((r) => !r.origin) || checkouts[0];
+
+/** Routes that belong to the **app**, not to a repository.
+ *
+ *  **A secondary daemon has no Tauri handle**, because `attach_window` is only
+ *  ever called on the one that opened the window ([`crate::peers`]). So a window
+ *  command sent to a peer is refused with "no native window attached" — which is
+ *  exactly what happened: `call` follows the *active* repository, so selecting a
+ *  session in another checkout quietly moved the titlebar's buttons, the resize
+ *  edges and Restart onto a daemon that cannot drive a window. Reported as an
+ *  occasional toast, because it only shows up once you are working in a peer.
+ *
+ *  Prefix-matched rather than listed exactly: `/api/window/` has a command and a
+ *  resize edge under it, and a new one must not have to be remembered here. */
+const SHELL_ROUTES = ['/api/window/', '/api/open', '/api/client/timing', '/api/update/'];
+const isShellRoute = (path) => SHELL_ROUTES.some((r) => path.startsWith(r));
+
 /** Whether this window is showing more than one repository at all.
  *
  *  Read wherever the single-repository shape has to keep looking exactly as it
@@ -240,7 +261,7 @@ export function reportBoot() {
     reported = true;
     // Failure is silence. This is a diagnostic, and a toast about it would be
     // the app complaining to the user on the user's behalf.
-    call('/api/client/timing', { marks }).catch(() => {});
+    callShell('/api/client/timing', { marks }).catch(() => {});
   }, 1500);
 }
 
@@ -556,6 +577,13 @@ export function promptBox(message, { value = '', placeholder = '', ok = 'OK' } =
  * every call and both websockets through the primary. */
 export async function callOn(repoId, path, body) {
   const repo = repoById(repoId);
+  /* **A shell route sent anywhere but the shell is a bug here, not a refusal
+     there.** The daemon's own answer ("no native window attached") is correct and
+     unhelpful: it says the peer cannot do it, not that the caller should not have
+     asked. Caught at the source so the next one is obvious. */
+  if (repo !== localRepo && isShellRoute(path)) {
+    throw new Error(`${path} belongs to the app, not a repository — use callShell`);
+  }
   const res = await fetch(`${repo.origin}${path}`, {
     method: 'POST',
     headers: {
@@ -581,6 +609,11 @@ export async function getOn(repoId, path) {
 
 export const call = (path, body) => callOn(activeRepo.id, path, body);
 export const get = (path) => getOn(activeRepo.id, path);
+
+/** For the routes the *app* owns: the window, the OS opener, the page's own boot
+ *  timing, an upgrade. Always the daemon that served this page, whatever
+ *  repository you happen to be working in. */
+export const callShell = (path, body) => callOn(localRepo.id, path, body);
 
 export function duration(ms) {
   if (ms == null) return '';
