@@ -240,6 +240,62 @@
   </div>
   <div class="settings-card">
     <div class="settings-group">Appearance</div>
+
+    <!-- A theme is three colours and a font; every other token in the sheet is
+         mixed from them (`core.js`, `tokens`). The semantic colours — amber for
+         "needs you", red for a failed build — are deliberately not offered: they
+         are a legend three panes read, not decoration. -->
+    <div class="settings-row">
+      <span class="settings-k">Theme</span>
+      <span class="settings-step">
+        <select class="settings-in" id="thpreset" title="A starting point to adjust from"></select>
+      </span>
+    </div>
+    <div class="settings-row">
+      <span class="settings-k">Font</span>
+      <span class="settings-step">
+        <select class="settings-in" id="thfont"></select>
+      </span>
+    </div>
+    <!-- Only for `custom`: the vendored faces ship with the app, and a family the
+         machine happens to have can only be named. -->
+    <div class="settings-row" id="thcustomrow" hidden>
+      <span class="settings-k">Font name
+        <span class="settings-hint">as installed</span>
+      </span>
+      <span class="settings-step">
+        <input class="settings-in" id="thcustom" type="text" spellcheck="false"
+               placeholder="SF Mono" autocomplete="off">
+      </span>
+    </div>
+    <div class="settings-row">
+      <span class="settings-k">Background</span>
+      <span class="settings-step">
+        <input class="settings-col" id="thbg" type="color">
+        <input class="settings-in settings-in-hex" id="thbghex" type="text"
+               spellcheck="false" autocomplete="off" maxlength="7">
+      </span>
+    </div>
+    <div class="settings-row">
+      <span class="settings-k">Panels
+        <span class="settings-hint">rail, headers</span>
+      </span>
+      <span class="settings-step">
+        <input class="settings-col" id="thpanel" type="color">
+        <input class="settings-in settings-in-hex" id="thpanelhex" type="text"
+               spellcheck="false" autocomplete="off" maxlength="7">
+      </span>
+    </div>
+    <div class="settings-row">
+      <span class="settings-k">Text</span>
+      <span class="settings-step">
+        <input class="settings-col" id="thtext" type="color">
+        <input class="settings-in settings-in-hex" id="thtexthex" type="text"
+               spellcheck="false" autocomplete="off" maxlength="7">
+        <button class="settings-reset" id="threset" type="button">Reset</button>
+      </span>
+    </div>
+
     <div class="settings-row">
       <span class="settings-k">Font size</span>
       <span class="settings-step">

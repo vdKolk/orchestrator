@@ -1,7 +1,7 @@
 // The settings panel. The zoom control it offers lives in core, because the
 // terminals read the scale too.
 
-import { ctl, $, WHEEL, ZOOM, call, caret, closeLegend, el, get, MOD_LABEL, saveWheel, saveZoom, setWheel, setZoom, snap, wheelScale, zoomScale } from './core.js';
+import { ctl, $, FONTS, PRESETS, WHEEL, ZOOM, call, caret, closeLegend, el, get, MOD_LABEL, saveWheel, saveZoom, setTheme, setWheel, setZoom, snap, theme, wheelScale, zoomScale } from './core.js';
 
 const settingsOpen = () => !$('settings').hidden;
 
@@ -14,6 +14,88 @@ function closeSettings() {
 // as the string the input shows (command joined by spaces, patterns by commas);
 // `saveSettings` parses them back to arrays. Mutated in place by the row inputs.
 let procDraft = [];
+
+/* ---------------------------------------------------------------------------
+ * Theme
+ * ------------------------------------------------------------------------- */
+
+/** Which preset the three colours currently match, or `''` for none.
+ *
+ *  Derived rather than stored, which is what makes the dropdown honest: adjust
+ *  one colour off a preset and it stops claiming to be that preset, without
+ *  anything having to remember that you did. */
+function currentPreset() {
+  for (const [k, v] of Object.entries(PRESETS)) {
+    if (v.bg === theme.bg && v.panel === theme.panel && v.text === theme.text) return k;
+  }
+  return '';
+}
+
+/** Put the controls where the theme is. Called on setup and after every change,
+ *  because a preset moves three fields and a colour moves the preset. */
+function showTheme() {
+  const preset = currentPreset();
+  ctl('thpreset').value = preset;
+  ctl('thfont').value = theme.font;
+  $('thcustomrow').hidden = theme.font !== 'custom';
+  ctl('thcustom').value = theme.custom || '';
+  for (const [id, value] of [['thbg', theme.bg], ['thpanel', theme.panel], ['thtext', theme.text]]) {
+    ctl(id).value = value;
+    ctl(`${id}hex`).value = value;
+  }
+}
+
+function setupTheme() {
+  const presets = ctl('thpreset');
+  /* An empty option for "none of them", selected whenever the colours have been
+     adjusted. Without it the dropdown would keep naming the preset you started
+     from, which is a control lying about the state it is showing. */
+  presets.appendChild(el('option', null, 'Custom')).value = '';
+  for (const [k, v] of Object.entries(PRESETS)) {
+    presets.appendChild(el('option', null, v.label)).value = k;
+  }
+  presets.onchange = () => {
+    const p = PRESETS[presets.value];
+    // Only the three colours: a preset is a palette, and taking the font with it
+    // would undo a choice you made about something else.
+    if (p) applyAndShow({ bg: p.bg, panel: p.panel, text: p.text });
+  };
+
+  const fonts = ctl('thfont');
+  for (const [k, v] of Object.entries(FONTS)) {
+    fonts.appendChild(el('option', null, v.label)).value = k;
+  }
+  fonts.appendChild(el('option', null, 'Name it yourself…')).value = 'custom';
+  fonts.onchange = () => applyAndShow({ font: fonts.value });
+
+  /* `change`, not `input`: a font name is typed a character at a time, and
+     re-measuring every terminal's cell metrics on each keystroke — which is what
+     `applyTheme`'s refit does — would fight the person typing. */
+  ctl('thcustom').onchange = () => applyAndShow({ custom: ctl('thcustom').value });
+
+  for (const [id, field] of [['thbg', 'bg'], ['thpanel', 'panel'], ['thtext', 'text']]) {
+    /* `input` here, because a colour well is dragged and watching the board
+       follow is the whole point of having one. Cheap: this writes tokens and
+       repaints, and xterm's refit is the only real cost. */
+    ctl(id).oninput = () => applyAndShow({ [field]: ctl(id).value });
+    /* And the hex field on `change`, so a half-typed `#1` is not read as a
+       colour. Refused rather than corrected when it is not six digits: silently
+       rewriting what somebody pasted is worse than leaving it for them to see. */
+    ctl(`${id}hex`).onchange = () => {
+      const v = ctl(`${id}hex`).value.trim();
+      if (/^#?[0-9a-f]{6}$/i.test(v)) applyAndShow({ [field]: v.startsWith('#') ? v : `#${v}` });
+      else showTheme();
+    };
+  }
+
+  $('threset').onclick = () => applyAndShow({ ...PRESETS.orchd, font: 'plex', custom: null });
+  showTheme();
+}
+
+function applyAndShow(patch) {
+  setTheme(patch);
+  showTheme();
+}
 
 function openSettings() {
   // Two panes over the same pane is one too many, and the legend is the one you
@@ -219,6 +301,7 @@ function setupSettings() {
   $('wsdown').onclick = () => saveWheel(setWheel(wheelScale - WHEEL.step));
   $('wsup').onclick = () => saveWheel(setWheel(wheelScale + WHEEL.step));
   $('wsreset').onclick = () => saveWheel(setWheel(WHEEL.def));
+  setupTheme();
   $('setclose').onclick = () => closeSettings();
 
   $('setprocadd').onclick = () => {

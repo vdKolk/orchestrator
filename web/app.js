@@ -5,7 +5,7 @@
 import {
   TOKEN, WS_BASE, checkouts, activeRepo, $, el, toast, call, get, duration,
   snap, receive, keyActivate,
-  setZoom, saveZoom, onScaleChange, ZOOM, zoomScale,
+  setZoom, saveZoom, onScaleChange, ZOOM, zoomScale, onThemeChange, initTheme,
   selected, setSelected, onSelection, prForWorkspace,
   terms, CHROME, stateLabel, dotClass, isWaiting, isArchived,
   pending, byNewest, currentSession,
@@ -49,6 +49,9 @@ import * as Term from './js/term.js';
 
 // The terminals are the scalable thing zoom used to reach into; now they ask.
 onScaleChange(() => Term.applyScale());
+// Same shape, same reason: the board sets the tokens, the terminals repaint
+// themselves. A font change also refits, because it moves the cell metrics.
+onThemeChange(() => Term.applyTheme());
 
 // Collapsing the drawer redraws it and gives the terminal above its height back;
 // xterm only refits on an explicit nudge, not on a sibling's size change.
@@ -1807,6 +1810,11 @@ function setupColumns() {
 
 import * as Settings from './js/settings.js';
 
+/* **Before anything paints.** The tokens are written onto the root element, so a
+   theme applied after the first render means one frame of the default palette —
+   which on a light theme is a near-black flash. Ahead of `Settings.setup`, since
+   the controls there read the theme to show what is selected. */
+initTheme();
 Settings.setup();
 setupColumns();
 setupChrome();

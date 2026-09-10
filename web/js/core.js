@@ -722,6 +722,222 @@ export function setZoom(z) {
   return next;
 }
 
+/* ---------------------------------------------------------------------------
+ * Theme
+ * ------------------------------------------------------------------------- */
+
+/* **A theme is three colours and a font, and everything else is derived from
+ * them.** The sheet has some twenty tokens; offering twenty colour pickers would
+ * be a reliable way to produce an unreadable board — a border the same value as
+ * its background, dim text on a light ground. So the user sets the ground, the
+ * panel and the text, and the steps between them (`--raised`, `--hover`,
+ * `--line`, `--dim`, `--ghost`, …) are mixed from that pair here.
+ *
+ * **The semantic colours are deliberately not offered.** `--attn` is "needs you",
+ * `--bad` is a red build, `--ok` is passing: they are a legend the rail, the PR
+ * rows and the review queue all read, and a user who set amber to grey would not
+ * be theming, they would be turning a signal off. `--focus` stays out for the
+ * same reason.
+ *
+ * **In `localStorage`, like the UI scale and the column widths.** Nothing about
+ * which colours you like belongs in `config.json`, where a daemon that never
+ * reads it would have to carry it — the same reasoning `ZOOM` and the rail order
+ * already stand on.
+ *
+ * **Derived in JavaScript rather than with `color-mix()`**, which the sheet could
+ * have done: xterm takes hex strings and cannot read a CSS colour, so a mix the
+ * stylesheet owned would leave the terminal on a second, hand-written palette —
+ * which is exactly the duplicate this replaces (`term.js` had `#101010` and
+ * `#D2D2D2` written out again). One derivation, two consumers.
+ */
+
+export const THEME = { key: 'orch.theme' };
+
+/** The fonts the daemon serves, plus whatever the machine has.
+ *
+ *  The first three are `@font-face`d from `/vendor/fonts` in `app.css`, so they
+ *  work offline and look the same on every machine. `system` is the escape hatch
+ *  for somebody who wants the font their terminal uses — it cannot be shipped,
+ *  and naming a stack is the only honest way to offer it. */
+export const FONTS = {
+  plex: { label: 'IBM Plex Mono', stack: "'IBM Plex Mono',ui-monospace,monospace" },
+  jetbrains: { label: 'JetBrains Mono', stack: "'JetBrains Mono','IBM Plex Mono',ui-monospace,monospace" },
+  martian: { label: 'Martian Mono', stack: "'Martian Mono',ui-monospace,monospace" },
+  system: { label: 'System monospace', stack: 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace' },
+};
+
+/** Ground, panel and text — the three a preset has to answer.
+ *
+ *  `orchd` is the palette the app shipped with, so "Reset" is a real answer and
+ *  the default is not a preset that merely resembles it. The rest are starting
+ *  points to dial in from rather than an attempt to reproduce somebody's terminal
+ *  theme, which cannot be guessed. */
+export const PRESETS = {
+  orchd: { label: 'Orchd dark', bg: '#101010', panel: '#171717', text: '#D2D2D2' },
+  ink: { label: 'Ink', bg: '#0B0D12', panel: '#141821', text: '#C8D0DC' },
+  contrast: { label: 'High contrast', bg: '#000000', panel: '#0C0C0C', text: '#F2F2F2' },
+  paper: { label: 'Paper', bg: '#F4F2ED', panel: '#EAE7E0', text: '#22201C' },
+};
+
+const THEME_DEF = { ...PRESETS.orchd, font: 'plex', custom: null };
+
+/** @type {{bg:string, panel:string, text:string, font:string, custom:string|null, label?:string}} */
+export let theme = THEME_DEF;
+
+const themeListeners = [];
+export function onThemeChange(fn) { themeListeners.push(fn); }
+
+/* ---- colour arithmetic ---------------------------------------------------- */
+
+const hex = (v) => {
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(v || '').trim());
+  return m ? m[1] : null;
+};
+const rgb = (v) => {
+  const h = hex(v) || '000000';
+  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+};
+const out = ([r, g, b]) =>
+  '#' + [r, g, b].map((x) => Math.max(0, Math.min(255, Math.round(x))).toString(16).padStart(2, '0')).join('');
+
+/** `t` of the way from `a` to `b`. */
+const mix = (a, b, t) => {
+  const [x, y, z] = rgb(a);
+  const [p, q, r] = rgb(b);
+  return out([x + (p - x) * t, y + (q - y) * t, z + (r - z) * t]);
+};
+
+/* ---- the derived tokens --------------------------------------------------- */
+
+/** Every token the sheet needs, from the three the user set.
+ *
+ *  **Mixed toward the text colour, never "lighter".** That is what makes a light
+ *  theme work: on `paper` a border has to be *darker* than its ground, and a rule
+ *  that added white would have drawn it invisible. Mixing toward the foreground is
+ *  the same instruction in both directions. */
+function tokens(t) {
+  const { bg, panel, text } = t;
+  return {
+    '--bg': bg,
+    '--surface': panel,
+    // A row you are on, and a row under the pointer one step below it. Off the
+    // panel rather than the ground, because that is what they sit on.
+    '--raised': mix(panel, text, 0.1),
+    '--hover': mix(panel, text, 0.05),
+    '--line': mix(panel, text, 0.16),
+    '--line-soft': mix(panel, text, 0.1),
+    '--text': text,
+    '--dim': mix(bg, text, 0.72),
+    '--faint-solid': mix(bg, text, 0.54),
+    '--ghost': mix(bg, text, 0.42),
+    '--mono': fontStack(t),
+    // Read line by line, so it keeps its own face unless the choice *is* the
+    // reading font: a diff in Martian Mono is not something to inflict by
+    // accident.
+    '--code': t.font === 'plex' ? FONTS.jetbrains.stack : fontStack(t),
+  };
+}
+
+export function fontStack(t = theme) {
+  if (t.font === 'custom' && t.custom) {
+    /* Quoted because a family name with a space is otherwise two names, and
+       stripped of the characters that would end the declaration — this string goes
+       into a `style` property, so a stray `;` or `}` is the one way a font name
+       could reach further than a font name should. */
+    const name = String(t.custom).replace(/["';{}]/g, '').trim();
+    if (name) return `'${name}',ui-monospace,monospace`;
+  }
+  return (FONTS[t.font] || FONTS.plex).stack;
+}
+
+/** What xterm should paint with, from the same three colours.
+ *
+ *  The ANSI sixteen keep their hues — a red that is not red stops being an error
+ *  — but are mixed toward the ground so they sit on it rather than glowing off
+ *  it, which is what an unadjusted palette does on a light theme. */
+export function termColours(t = theme) {
+  const { bg, text } = t;
+  const on = (c, amount = 0.12) => mix(c, bg, amount);
+  return {
+    background: bg,
+    foreground: text,
+    cursor: text,
+    selectionBackground: mix(bg, text, 0.18),
+    black: bg,
+    red: on('#C9615A'), green: on('#5FA97C'), yellow: on('#E0A244'),
+    blue: on('#4C9AAF'), magenta: on('#9A7AA0'), cyan: on('#3E9AAF'),
+    white: text,
+    brightBlack: mix(bg, text, 0.42),
+    brightRed: '#D6756E', brightGreen: '#74BB90', brightYellow: '#EDB55C',
+    brightBlue: '#63AEC2', brightMagenta: '#B08FB6', brightCyan: '#57AEC2',
+    brightWhite: mix(text, '#FFFFFF', 0.4),
+  };
+}
+
+/* ---- reading, writing, applying ------------------------------------------- */
+
+function loadTheme() {
+  try {
+    const raw = localStorage.getItem(THEME.key);
+    const got = raw ? JSON.parse(raw) : null;
+    if (!got || typeof got !== 'object') return THEME_DEF;
+    // Field by field, and every colour re-validated: this is a file a person can
+    // hand-edit, and a token set from `"red; }"` would be writing CSS rather than
+    // picking a colour.
+    return {
+      bg: hex(got.bg) ? got.bg : THEME_DEF.bg,
+      panel: hex(got.panel) ? got.panel : THEME_DEF.panel,
+      text: hex(got.text) ? got.text : THEME_DEF.text,
+      font: got.font === 'custom' || FONTS[got.font] ? got.font : THEME_DEF.font,
+      custom: typeof got.custom === 'string' ? got.custom : null,
+    };
+  } catch {
+    return THEME_DEF;
+  }
+}
+
+/** Write the tokens onto the root, where the whole sheet reads them. */
+function applyTheme(t) {
+  const root = document.documentElement;
+  for (const [k, v] of Object.entries(tokens(t))) root.style.setProperty(k, v);
+  /* **`html` too, and not only the token.** `index.html` carries an inline
+     `html,body{background:#101010}` so the window is not white while `app.css`
+     parses, and Tauri paints the same value under the webview — both compiled in,
+     both dark. A light theme would keep that near-black behind every scroll
+     overshoot and rubber-band. This is as far as the page can reach: the *first*
+     frame is still the compiled-in colour, because it is painted before any script
+     runs. Fixing that last frame means the daemon substituting the colour into the
+     page and into `background_color`, which is a restart — see the note in
+     `TODO.md`. */
+  root.style.background = t.bg;
+}
+
+/** Change some of the theme and keep the rest.
+ *
+ *  A patch rather than a whole theme, because the controls set one field each and
+ *  a preset sets three; making every caller pass all of them is how one of them
+ *  would eventually reset the font by omission. */
+export function setTheme(patch) {
+  theme = { ...theme, ...patch };
+  applyTheme(theme);
+  try {
+    localStorage.setItem(THEME.key, JSON.stringify(theme));
+  } catch {
+    // A remembered theme is a convenience; failing to keep it is not worth a toast.
+  }
+  // Announced rather than applied, the same shape as `setZoom`: the terminals'
+  // own colours are xterm's business and `term.js` registers for this.
+  for (const fn of themeListeners) fn(theme);
+  return theme;
+}
+
+/** Read the stored theme and paint it. Called once, before the first render. */
+export function initTheme() {
+  theme = loadTheme();
+  applyTheme(theme);
+  return theme;
+}
+
 /* **How far one wheel event travels in an agent pane.** A multiplier on the pixel
  * delta, defaulting to 1 — which is exactly today's behaviour, so a trackpad keeps
  * the fix that put this handler here in the first place (a slow drag needs every

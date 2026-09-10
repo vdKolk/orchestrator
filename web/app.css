@@ -940,6 +940,19 @@ select.settings-in{
 }
 /* The open list is an OS menu, so it needs telling separately. */
 select.settings-in option{color:var(--text);background-color:var(--bg)}
+
+/* A colour well beside its hex field. Two ways into one value on purpose: the
+   swatch is how you *find* a colour and the hex is how you paste one you already
+   have — a terminal theme you like is a list of hex codes, not something you
+   rediscover by dragging a picker. */
+.settings-col{
+  flex:0 0 auto;width:30px;height:22px;padding:0;border:1px solid var(--line);
+  border-radius:2px;background:var(--bg);cursor:pointer;
+}
+.settings-col::-webkit-color-swatch-wrapper{padding:2px}
+.settings-col::-webkit-color-swatch{border:0;border-radius:1px}
+/* Narrow: it holds seven characters and never needs the 62% a text field takes. */
+.settings-in-hex{flex:0 0 8ch;margin-left:0;text-align:center}
 /* What a field is for, under the field rather than in a tooltip nobody hovers. */
 .settings-help{
   margin:4px 0 0;padding-left:2px;max-width:62ch;
