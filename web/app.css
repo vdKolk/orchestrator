@@ -453,6 +453,16 @@ button.ctx-btn:hover{color:var(--text)}
    `.settings` and `.overlay` deliberately do not — see their own rules. */
 .center{display:flex;flex-direction:column;min-width:0;background:var(--ground,var(--bg));position:relative}
 .termwrap{flex:1;min-height:0;position:relative;padding:8px 6px 8px 12px}
+/* **xterm's own viewport is opaque, and it has to stop being.** `xterm.css` sets
+   `.xterm .xterm-viewport { background-color: #000 }`, which the DOM renderer
+   leaves in place even with `allowTransparency` on — measured: the screen came
+   back `rgba(0,0,0,0)` and the viewport `rgb(0,0,0)`. So a see-through window had
+   a black rectangle where the terminal is.
+   Transparent rather than a colour of ours, so what shows through is `.center`'s
+   `--ground` — one surface deciding the pane's ground instead of two agreeing
+   about it. On an opaque window that is the theme's solid background, exactly as
+   before. The selector has to out-specify xterm's `.xterm .xterm-viewport`. */
+.xterm .xterm-viewport{background-color:transparent}
 .termhost{position:absolute;inset:8px 6px 8px 12px;transition:opacity .35s ease}
 .termhost[hidden]{display:none}
 /* A pane whose pty is not yet carrying live output: starting up before the first
@@ -901,26 +911,34 @@ body.row-resizing{cursor:row-resize;user-select:none}
 /* Which panes a setting reaches, where that is not obvious from its name. Dimmer
    and smaller than the key it qualifies, so the row still reads as one label. */
 .settings-hint{color:var(--faint-solid);font-size:calc(9.5px * var(--fs))}
-/* **The control column, and why it is fixed rather than fitted.** Right-aligned
-   with `margin-left:auto` and then two slots of known width: a select sizes to
-   its longest option, a colour well plus a hex field is a different width again,
-   and a stepper a third — so a step that fitted its contents put four rows on
-   four left edges. Measured before this: 326, 358, 384 and 402, with the rows
-   carrying a Reset ending 44px short of the rows without one.
-
-   `align-items:center` on the row already centres these vertically; what was
-   missing was any agreement about the horizontal. */
-.settings-step{margin-left:auto;display:flex;align-items:center;gap:8px}
-/* The control itself, right-aligned inside a fixed box so every row's ends at
-   the same x whatever it holds. 152px is the widest thing that has to fit — a
-   stepper at 24+44+24 plus its gaps — with room for the longest preset name. */
-.settings-ctl{
-  flex:0 0 152px;display:flex;align-items:center;justify-content:flex-end;gap:2px;min-width:0;
+/* **A grid, because two engines disagreed about the flexbox.** These rows want
+   three columns — label, control, reset — with the last two the same width on
+   every row, and the first version said so with `margin-left:auto` and
+   `flex:0 0 152px`. Chrome laid that out exactly as intended and measured
+   identical on all nine rows; WKWebView did not, and the reported symptom was the
+   Reset words ending at five different x positions.
+   Rather than find out which intrinsic-size rule the two read differently, this
+   states the tracks and lets neither of them choose: `1fr 152px 46px` is not a
+   negotiation. `min-width:0` on the middle track's box because a `select` and an
+   `input` both carry an intrinsic minimum that would otherwise push a track wider
+   than it was given — which is the family of rule the flex version tripped on. */
+.settings-row.arow{
+  display:grid;grid-template-columns:1fr 152px 46px;
+  align-items:center;column-gap:8px;
 }
-/* A reserved slot, present in every row of the group even when it holds nothing:
-   that is what keeps the control column's right edge honest. Right-aligned so the
-   word sits against the card's edge rather than floating in its box. */
-.settings-reset{flex:0 0 46px;text-align:right}
+/* The step wrapper stops being a layout in its own right: the grid places its two
+   children, so it is `display:contents` and adds nothing. Kept in the markup
+   because the two other sections' rows still use it as a flex group. */
+.settings-row.arow>.settings-step{display:contents}
+/* Right-aligned inside its track, whatever it holds. */
+.settings-ctl{
+  display:flex;align-items:center;justify-content:flex-end;gap:2px;min-width:0;
+}
+/* The last track. Right-aligned so the word sits against the card's edge rather
+   than floating in its column. */
+.settings-reset{text-align:right;min-width:0}
+/* The two rows outside the appearance grid keep the flex group they had. */
+.settings-step{margin-left:auto;display:flex;align-items:center;gap:8px}
 .stepbtn{
   width:24px;height:24px;border-radius:2px;border:1px solid var(--line);
   font-family:var(--mono);font-size:calc(11.5px * var(--fs));line-height:1;color:var(--dim);

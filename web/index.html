@@ -252,7 +252,7 @@
          a Reset ended 44px short of the rows without one. `.settings-ctl` is a
          fixed-width right-aligned box and `.settings-reset` is a reserved slot —
          empty where there is nothing to reset, so it still holds the column. -->
-    <div class="settings-row">
+    <div class="settings-row arow">
       <span class="settings-k">Theme</span>
       <span class="settings-step">
         <span class="settings-ctl">
@@ -266,7 +266,7 @@
         <button class="settings-reset" id="threset" type="button">Reset</button>
       </span>
     </div>
-    <div class="settings-row">
+    <div class="settings-row arow">
       <span class="settings-k">Font</span>
       <span class="settings-step">
         <span class="settings-ctl">
@@ -278,7 +278,7 @@
     </div>
     <!-- Only for `custom`: the vendored faces ship with the app, and a family the
          machine happens to have can only be named. -->
-    <div class="settings-row" id="thcustomrow" hidden>
+    <div class="settings-row arow" id="thcustomrow" hidden>
       <span class="settings-k">Font name
         <span class="settings-hint">as installed</span>
       </span>
@@ -290,7 +290,7 @@
         <button class="settings-reset" id="thcustomreset" type="button">Clear</button>
       </span>
     </div>
-    <div class="settings-row">
+    <div class="settings-row arow">
       <span class="settings-k">Background</span>
       <span class="settings-step">
         <span class="settings-ctl">
@@ -301,7 +301,7 @@
         <button class="settings-reset" id="thbgreset" type="button">Reset</button>
       </span>
     </div>
-    <div class="settings-row">
+    <div class="settings-row arow">
       <span class="settings-k">Panels
         <span class="settings-hint">rail, headers</span>
       </span>
@@ -314,7 +314,7 @@
         <button class="settings-reset" id="thpanelreset" type="button">Reset</button>
       </span>
     </div>
-    <div class="settings-row">
+    <div class="settings-row arow">
       <span class="settings-k">Text</span>
       <span class="settings-step">
         <span class="settings-ctl">
@@ -329,7 +329,7 @@
     <!-- The level, live. Whether the window lets light through at all is a
          config key and a restart (`window_transparent`, under Window below),
          because transparency is fixed when the window is created. -->
-    <div class="settings-row" id="throw">
+    <div class="settings-row arow" id="throw">
       <span class="settings-k">Opacity
         <span class="settings-hint" id="thopachint">needs a transparent window</span>
       </span>
@@ -343,7 +343,7 @@
       </span>
     </div>
 
-    <div class="settings-row">
+    <div class="settings-row arow">
       <span class="settings-k">Font size</span>
       <span class="settings-step">
         <span class="settings-ctl">
@@ -359,7 +359,7 @@
          reads its `scrollSensitivity`. 100% is what the pane has always done, so
          this changes nothing until asked — see `WHEEL` in core.js for why a
          discrete wheel and a trackpad cannot share one number. -->
-    <div class="settings-row">
+    <div class="settings-row arow">
       <span class="settings-k">Wheel speed
         <span class="settings-hint">agent panes</span>
       </span>

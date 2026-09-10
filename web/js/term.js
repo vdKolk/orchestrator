@@ -193,7 +193,21 @@ function openTerm(target, parent) {
    * Not the *scrolling* complaint, which was the other suspect this was held
    * against: that turned out to be xterm damping sub-50px wheel deltas, measured
    * separately, and no renderer would have changed it. */
-  const webglWanted = CHROME === 'none' || (IS_MAC && agentPane);
+  /* **A see-through window costs the canvas, and that is a real trade.** xterm's
+     WebGL renderer paints an opaque ground: `allowTransparency` reaches the DOM
+     renderer and not that one, so on macOS — where the rule above keeps WebGL for
+     the agent pane — the largest surface in a transparent window stayed solid
+     while everything around it let light through. Which is the whole effect,
+     missing from the pane you look at.
+     So asking for transparency gives up what the macOS rule was buying: the
+     typing-lag mitigation a Retina panel needs while Claude Code repaints its
+     whole TUI per keystroke. That is the cost of the setting, and it is the
+     honest way round — a transparency setting that visibly does not apply to the
+     terminal is worse than one that says what it costs.
+     A **browser tab keeps the canvas** whatever this says: there is nothing behind
+     a tab to show through, so giving up WebGL there would be a cost with no
+     effect at all. */
+  const webglWanted = CHROME === 'none' || (IS_MAC && agentPane && !TRANSPARENT);
   // Named for the log line below: a bug report could not say which renderer it was
   // on, and on a packaged app there is no console to ask.
   const engine = CHROME === 'none' ? 'browser' : IS_MAC ? 'wkwebview' : 'webkitgtk';
@@ -214,7 +228,7 @@ function openTerm(target, parent) {
       note(`${target}: webgl refused (${e}), using the dom renderer`);
     }
   }
-  note(`${target} renderer=${renderer} engine=${engine}`);
+  note(`${target} renderer=${renderer} engine=${engine}${TRANSPARENT ? ' transparent' : ''}`);
 
   /* **A slow trackpad drag scrolls an agent pane in jerks, and xterm's own wheel
    * maths is why.** With mouse reporting on — Claude Code sets `?1000h`,
