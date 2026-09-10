@@ -2,7 +2,7 @@
 // over a websocket. The DOM renderer is deliberate under WebKitGTK, and only
 // there — see the renderer comment below, and CLAUDE.md.
 
-import { $, CHROME, IS_MAC, activeRepo, copyText, el, fontStack, mark, note, onThemeChange, reportBoot, selected, termColours, terms, toast, typingElsewhere, uiScale, wheelScale } from './core.js';
+import { $, CHROME, IS_MAC, TRANSPARENT, activeRepo, copyText, el, fontStack, mark, note, onThemeChange, reportBoot, selected, termColours, terms, toast, typingElsewhere, uiScale, wheelScale } from './core.js';
 
 
 /* **Derived, not written out.** This used to be a literal palette that repeated
@@ -42,6 +42,11 @@ function openTerm(target, parent) {
 
   const term = new Terminal({
     theme: THEME(),
+    /* Fixed at construction, which is why the daemon tells the page at boot
+       rather than the page asking later: a terminal built without this paints an
+       opaque ground however much alpha its theme carries. Harmless when the
+       window is opaque — there is simply nothing behind it to show. */
+    allowTransparency: TRANSPARENT,
     // The theme's font, not a literal: the terminal is the pane you read most, so
     // a font choice that skipped it would be a choice about labels.
     fontFamily: fontStack(),

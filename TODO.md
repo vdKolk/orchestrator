@@ -5,38 +5,28 @@ this file, which churned it from every build; that feature is gone.
 
 ## Next
 
-- **A partially transparent window, which the theme cannot reach.** Colours, the
-  font and the terminal's palette are all settable now (`core.js`'s theme block,
-  three inputs and the rest mixed from them). Transparency is the one appearance
-  request that is *not* a CSS token, and it is worth writing down why rather than
-  discovering it again.
+- **Built: a transparent window, and the one frame it still gets wrong.**
+  `window_transparent` is a config key with a restart, the level is a live theme
+  value, and the board's surfaces carry the alpha while `.settings` and `.overlay`
+  deliberately stay opaque — a form you read the desktop through is the
+  readability problem transparency causes rather than the effect it is for.
 
-  **What it needs.** `WebviewWindowBuilder::transparent(true)` exists in tauri
-  2.11, but on macOS it is gated behind the crate's **`macos-private-api`**
-  feature and `"macOSPrivateApi": true` in `tauri.conf.json` — neither of which
-  this app enables. That is a *maintainer's* decision and not a build detail: it
-  opts the app into private Apple APIs, which is an App Store rejection risk, so
-  it should not arrive as a side effect of a theming change.
+  **What it cost, so nobody has to rediscover it.** It compiles in tauri's
+  `macos-private-api`, which uses private Apple frameworks and makes a build
+  ineligible for the App Store; the setting is off by default and the pane says
+  so. And it gives up the opaque `background_color` that stopped a white flash on
+  load, because there is no third option: a ground opaque enough to hide the flash
+  is opaque enough to hide the desktop.
 
-  **What it collides with.** `background_color(0x10, 0x10, 0x10, 0xFF)` in
-  `build_window` is opaque on purpose — the comment there says why: a webview
-  paints white until a document says otherwise, and there are two moments (the
-  splash being fetched, the navigate to the daemon) when none has. Transparency
-  means giving that guard up or replacing it, and the failure it prevents is a
-  white flash the size of the window.
+  **Still open: the first frame.** `index.html` carries an inline
+  `html,body{background:#101010}` and that colour is compiled in, so a light theme
+  or a transparent window still shows one frame of near-black before any script
+  runs. The page repaints `html` immediately after. Fixing the frame means the
+  daemon substituting the theme's own ground into the page — which needs the
+  colour where the *daemon* can read it, and the theme lives in `localStorage`. So
+  it is the same question as making the theme portable between machines, and worth
+  doing as that rather than as a flash fix.
 
-  **And it cannot live where the rest of the theme lives.** The theme is
-  `localStorage`, like the UI scale — but transparency is fixed when the window is
-  *created*, before any page has run, so the shell has to know it first. That makes
-  it a `config.json` key and a restart to toggle, unlike every other appearance
-  setting. The same asymmetry already applies to the first frame's background: the
-  page can repaint `html` but not the colour compiled into `index.html`'s inline
-  style and into `background_color`, so a light theme still flashes near-black for
-  one frame. Both are fixed by the same thing — the daemon substituting the
-  colour, and the shell reading it before the window exists.
-
-  Worth doing together, or not at all: transparency without the substituted ground
-  is a window that flashes opaque dark before it goes see-through.
 
 - **`edit::read` closes the symlink race on the final component only.** The parents
   are canonicalised earlier and can still be swapped between the check and the open;

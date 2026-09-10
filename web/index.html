@@ -258,7 +258,11 @@
         <span class="settings-ctl">
           <select class="settings-in" id="thpreset" title="A starting point to adjust from"></select>
         </span>
-        <!-- The whole theme's reset, on the row that names it. -->
+        <!-- **One per row, and each resets only its own row.** Not tidiness: a
+             reserved-but-empty slot left the three rows that *do* carry a Reset
+             sticking 54px further right than the five that do not, which is the
+             ragged right edge this group had. The word repeats; the column does
+             not wander. -->
         <button class="settings-reset" id="threset" type="button">Reset</button>
       </span>
     </div>
@@ -266,9 +270,10 @@
       <span class="settings-k">Font</span>
       <span class="settings-step">
         <span class="settings-ctl">
-          <select class="settings-in" id="thfont"></select>
+          <select class="settings-in" id="thfont"
+                title="The vendored faces, the system one, and the monospace families found on this machine"></select>
         </span>
-        <span class="settings-reset"></span>
+        <button class="settings-reset" id="thfontreset" type="button">Reset</button>
       </span>
     </div>
     <!-- Only for `custom`: the vendored faces ship with the app, and a family the
@@ -282,7 +287,7 @@
           <input class="settings-in" id="thcustom" type="text" spellcheck="false"
                  placeholder="SF Mono" autocomplete="off">
         </span>
-        <span class="settings-reset"></span>
+        <button class="settings-reset" id="thcustomreset" type="button">Clear</button>
       </span>
     </div>
     <div class="settings-row">
@@ -293,7 +298,7 @@
           <input class="settings-in settings-in-hex" id="thbghex" type="text"
                  spellcheck="false" autocomplete="off" maxlength="7" aria-label="Background hex">
         </span>
-        <span class="settings-reset"></span>
+        <button class="settings-reset" id="thbgreset" type="button">Reset</button>
       </span>
     </div>
     <div class="settings-row">
@@ -306,7 +311,7 @@
           <input class="settings-in settings-in-hex" id="thpanelhex" type="text"
                  spellcheck="false" autocomplete="off" maxlength="7" aria-label="Panel hex">
         </span>
-        <span class="settings-reset"></span>
+        <button class="settings-reset" id="thpanelreset" type="button">Reset</button>
       </span>
     </div>
     <div class="settings-row">
@@ -317,7 +322,24 @@
           <input class="settings-in settings-in-hex" id="thtexthex" type="text"
                  spellcheck="false" autocomplete="off" maxlength="7" aria-label="Text hex">
         </span>
-        <span class="settings-reset"></span>
+        <button class="settings-reset" id="thtextreset" type="button">Reset</button>
+      </span>
+    </div>
+
+    <!-- The level, live. Whether the window lets light through at all is a
+         config key and a restart (`window_transparent`, under Window below),
+         because transparency is fixed when the window is created. -->
+    <div class="settings-row" id="throw">
+      <span class="settings-k">Opacity
+        <span class="settings-hint" id="thopachint">needs a transparent window</span>
+      </span>
+      <span class="settings-step">
+        <span class="settings-ctl">
+          <button class="stepbtn" id="thopdown" title="More see-through">&#8722;</button>
+          <span class="stepval" id="thopval">100%</span>
+          <button class="stepbtn" id="thopup" title="More solid">+</button>
+        </span>
+        <button class="settings-reset" id="thopreset" type="button">Reset</button>
       </span>
     </div>
 
@@ -422,6 +444,21 @@
       running in it. The conversation stays in the rail and a resume rebuilds the
       tree, so this frees disk rather than losing work. <code>0</code> never removes
       anything.</p>
+
+    <div class="settings-group">Window</div>
+
+    <label class="settings-field">
+      <span class="settings-k">Transparent window</span>
+      <input class="settings-check" id="settransparent" type="checkbox">
+    </label>
+    <p class="settings-help">Let the desktop show through the board, at the level the
+      <em>Opacity</em> setting above chooses. Needs a restart, and it is the one
+      appearance setting that does: transparency is fixed when the window is created,
+      before any page has run, so it cannot be a live choice the way the colours are.
+      Two costs worth knowing. It gives up the opaque window background that stops a
+      white flash while the page loads, so a launch shows one frame of nothing. And
+      on macOS it needs Tauri's <code>macos-private-api</code>, which uses private
+      Apple frameworks and makes a build ineligible for the App Store.</p>
 
     <div class="settings-group">Sessions</div>
 
@@ -543,7 +580,7 @@
      pause. Visually hidden; app.js writes the transition into it. -->
 <div id="live" class="sr-only" aria-live="polite" aria-atomic="true"></div>
 
-<script>window.__ORCH__ = { token: "__ORCH_TOKEN__", chrome: "__ORCH_CHROME__", platform: "__ORCH_PLATFORM__", checkouts: __ORCH_CHECKOUTS__ };</script>
+<script>window.__ORCH__ = { token: "__ORCH_TOKEN__", chrome: "__ORCH_CHROME__", platform: "__ORCH_PLATFORM__", checkouts: __ORCH_CHECKOUTS__, transparent: "__ORCH_TRANSPARENT__" };</script>
 <script src="/vendor/xterm.js"></script>
 <script src="/vendor/addon-fit.js"></script>
 <script src="/vendor/addon-webgl.js"></script>

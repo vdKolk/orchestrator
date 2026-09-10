@@ -1,7 +1,7 @@
 // The settings panel. The zoom control it offers lives in core, because the
 // terminals read the scale too.
 
-import { ctl, $, FONTS, PRESETS, WHEEL, ZOOM, call, caret, closeLegend, el, get, MOD_LABEL, saveWheel, saveZoom, setTheme, setWheel, setZoom, snap, theme, wheelScale, zoomScale } from './core.js';
+import { ctl, $, FONTS, OPACITY, PRESETS, TRANSPARENT, WHEEL, ZOOM, call, caret, clampOpacity, closeLegend, el, get, MOD_LABEL, saveWheel, saveZoom, setTheme, setWheel, setZoom, snap, theme, wheelScale, zoomScale } from './core.js';
 
 const settingsOpen = () => !$('settings').hidden;
 
@@ -43,6 +43,14 @@ function showTheme() {
     ctl(id).value = value;
     ctl(`${id}hex`).value = value;
   }
+
+  /* **Shown but disabled when the window is opaque, rather than hidden.** An
+     absent control reads as a missing feature; a dead one with the reason beside
+     it reads as a thing to switch on, which is what it is. The hint names where. */
+  $('thopval').textContent = `${Math.round(theme.opacity * 100)}%`;
+  ctl('thopdown').disabled = !TRANSPARENT || theme.opacity <= OPACITY.min;
+  ctl('thopup').disabled = !TRANSPARENT || theme.opacity >= OPACITY.max;
+  $('thopachint').hidden = TRANSPARENT;
 }
 
 function setupTheme() {
@@ -65,7 +73,9 @@ function setupTheme() {
   for (const [k, v] of Object.entries(FONTS)) {
     fonts.appendChild(el('option', null, v.label)).value = k;
   }
-  fonts.appendChild(el('option', null, 'Name it yourself…')).value = 'custom';
+  /* Last, and only a fallback now that the list is detected rather than guessed:
+     a family this machine has under a name `MONO_CANDIDATES` does not carry. */
+  fonts.appendChild(el('option', null, 'Other…')).value = 'custom';
   fonts.onchange = () => applyAndShow({ font: fonts.value });
 
   /* `change`, not `input`: a font name is typed a character at a time, and
@@ -88,11 +98,26 @@ function setupTheme() {
     };
   }
 
-  /* Says what it takes with it. It sits on the Theme row because that is the row
-     that names the thing, but it puts the *font* back too — and a Reset on one row
-     quietly changing another is the kind of surprise a tooltip is for. */
-  $('threset').title = 'Back to the colours and font the app shipped with';
-  $('threset').onclick = () => applyAndShow({ ...PRESETS.orchd, font: 'plex', custom: null });
+  /* **Each row resets its own row and nothing else.** The Theme reset used to put
+     the font back too, on the grounds that it was "the theme" — a Reset on one row
+     silently changing another, which a tooltip papered over rather than fixed.
+     Now the row you press is the row that changes. */
+  $('threset').title = 'The three colours, back to Orchd dark';
+  $('threset').onclick = () => applyAndShow({
+    bg: PRESETS.orchd.bg, panel: PRESETS.orchd.panel, text: PRESETS.orchd.text,
+  });
+  $('thfontreset').onclick = () => applyAndShow({ font: 'plex', custom: null });
+  /* "Clear", not "Reset": there is no default name to go back to — the field is
+     either empty or it holds one you typed. */
+  $('thcustomreset').onclick = () => applyAndShow({ custom: null });
+  for (const [id, field] of [['thbg', 'bg'], ['thpanel', 'panel'], ['thtext', 'text']]) {
+    $(`${id}reset`).onclick = () => applyAndShow({ [field]: PRESETS.orchd[field] });
+  }
+
+  const opacity = (v) => applyAndShow({ opacity: clampOpacity(v) });
+  $('thopdown').onclick = () => opacity(theme.opacity - OPACITY.step);
+  $('thopup').onclick = () => opacity(theme.opacity + OPACITY.step);
+  $('thopreset').onclick = () => opacity(OPACITY.def);
   showTheme();
 }
 
@@ -138,6 +163,7 @@ async function loadConfigInto() {
   // the setting being off said out loud, where '' would read as unset.
   ctl('setretain').value = String(cfg.worktree_retention_days ?? 0);
   ctl('setseveral').checked = !!cfg.allow_several_in_main;
+  ctl('settransparent').checked = !!cfg.window_transparent;
   procDraft = (cfg.main_processes || []).map((p) => ({
     name: p.name || '',
     command: (p.command || []).join(' '),
@@ -248,6 +274,7 @@ async function saveSettings() {
     // not a shorter retention.
     worktree_retention_days: Math.max(0, Math.trunc(Number(ctl('setretain').value) || 0)),
     allow_several_in_main: !!ctl('setseveral').checked,
+    window_transparent: !!ctl('settransparent').checked,
     main_processes: procDraft.map((p) => ({
       name: p.name.trim(),
       command: argv(p.command),

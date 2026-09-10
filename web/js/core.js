@@ -66,6 +66,21 @@ export function setSelected(id, auto = false) {
 export const TOKEN = window.__ORCH__.token;
 export const WS_BASE = `ws://${location.host}`;
 
+/** Whether the daemon is running on macOS. Told, not sniffed.
+ *
+ *  Declared up here rather than beside `MOD_LABEL` and `CHROME`, where it used to
+ *  sit: `FONTS` reads it at module scope to label the system face, and a `const`
+ *  read before its declaration is a temporal dead zone — a runtime crash on load
+ *  that `tsc` does not see. */
+export const IS_MAC = window.__ORCH__.platform === 'mac';
+
+/** Whether the window was created see-through (`config.window_transparent`).
+ *
+ *  Fixed at window creation, so this is told at boot and never changes while the
+ *  page lives — which is exactly why the *opacity* is a separate, live theme value
+ *  and this is not. */
+export const TRANSPARENT = window.__ORCH__.transparent === '1';
+
 /* ---------------------------------------------------------------------------
  * Repositories
  * ------------------------------------------------------------------------- */
@@ -753,18 +768,88 @@ export function setZoom(z) {
 
 export const THEME = { key: 'orch.theme' };
 
-/** The fonts the daemon serves, plus whatever the machine has.
+/** Monospace families worth *asking* about.
+ *
+ *  **A list, because a page cannot enumerate installed fonts here.**
+ *  `queryLocalFonts()` is the API for that and it is Chromium-only, behind a
+ *  permission prompt — absent from WebKit, so absent from WKWebView on macOS and
+ *  WebKitGTK on Linux, which is every window this app opens. What *is*
+ *  engine-agnostic is asking whether one named family exists ([`installed`]), so
+ *  the offer is a generous list filtered down to what is really there.
+ *
+ *  Notably **not** `SF Mono`. It is on every Mac — `/System/Library/Fonts/
+ *  SFNSMono.ttf` — and Apple does not expose the system faces to web content
+ *  under their own names: measured, and both `SF Mono` and `SFMono-Regular` come
+ *  back absent while `ui-monospace` measures 1015.88 against `monospace`'s 864.14,
+ *  which is SF Mono answering to the generic. So the generic is the way in, and
+ *  `system` below is that door with the right label on it. */
+const MONO_CANDIDATES = [
+  'Menlo', 'Monaco', 'Andale Mono', 'PT Mono', 'Courier New',
+  'Cascadia Mono', 'Cascadia Code', 'Consolas', 'Lucida Console',
+  'Fira Code', 'Fira Mono', 'Hack', 'Source Code Pro', 'Roboto Mono',
+  'Ubuntu Mono', 'DejaVu Sans Mono', 'Liberation Mono', 'Noto Sans Mono',
+  'Inconsolata', 'Iosevka', 'Victor Mono', 'Geist Mono', 'Berkeley Mono',
+  'Operator Mono', 'Anonymous Pro', 'Space Mono', 'Recursive Mono',
+  'SF Mono',
+];
+
+/** Is this family actually on the machine?
+ *
+ *  Measured rather than asked, and against **two** different fallbacks: a family
+ *  that is missing falls back to each of them and so measures two different
+ *  widths, while one that exists measures the same width whatever sits behind it.
+ *  `document.fonts.check` looks like the direct answer and is not — it reports
+ *  true for a family the engine merely intends to substitute.
+ *
+ *  The probe mixes wide and narrow glyphs so two similar monospace faces still
+ *  differ; a single `m` would collide too easily. */
+function installed(name, ctx) {
+  const w = (family) => {
+    ctx.font = `72px ${family}`;
+    return Math.round(ctx.measureText('mmmmmmmmmmlliWWWW0Oo').width * 100) / 100;
+  };
+  const a = w(`'${name}',serif`);
+  return a === w(`'${name}',sans-serif`) && a === w(`'${name}',monospace`);
+}
+
+/** The vendored faces, the system one, and whatever else is really here.
  *
  *  The first three are `@font-face`d from `/vendor/fonts` in `app.css`, so they
- *  work offline and look the same on every machine. `system` is the escape hatch
- *  for somebody who wants the font their terminal uses — it cannot be shipped,
- *  and naming a stack is the only honest way to offer it. */
-export const FONTS = {
-  plex: { label: 'IBM Plex Mono', stack: "'IBM Plex Mono',ui-monospace,monospace" },
-  jetbrains: { label: 'JetBrains Mono', stack: "'JetBrains Mono','IBM Plex Mono',ui-monospace,monospace" },
-  martian: { label: 'Martian Mono', stack: "'Martian Mono',ui-monospace,monospace" },
-  system: { label: 'System monospace', stack: 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace' },
-};
+ *  work offline and look the same on every machine — and are excluded from the
+ *  detected list below, because a `@font-face`d family measures as *installed*
+ *  whether or not the machine has it. IBM Plex Mono came back "present" on a
+ *  machine that has no such file, for exactly that reason. */
+export const FONTS = (() => {
+  const vendored = {
+    plex: { label: 'IBM Plex Mono', stack: "'IBM Plex Mono',ui-monospace,monospace" },
+    jetbrains: { label: 'JetBrains Mono', stack: "'JetBrains Mono','IBM Plex Mono',ui-monospace,monospace" },
+    martian: { label: 'Martian Mono', stack: "'Martian Mono',ui-monospace,monospace" },
+    system: {
+      // Named for what it resolves to, because "System monospace" is not what
+      // anybody is looking for when they want SF Mono — and on a Mac this is it.
+      label: IS_MAC ? 'SF Mono (system)' : 'System monospace',
+      stack: 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace',
+    },
+  };
+  const shipped = new Set(Object.values(vendored).map((f) => f.label));
+  let found = [];
+  try {
+    const ctx = document.createElement('canvas').getContext('2d');
+    if (ctx) {
+      found = MONO_CANDIDATES
+        .filter((n) => !shipped.has(n))
+        .filter((n) => installed(n, ctx));
+    }
+  } catch {
+    // No canvas, no detection: the vendored faces and the system stack are still
+    // a complete offer, so this degrades to what it was.
+  }
+  const detected = {};
+  for (const name of found.sort()) {
+    detected[name] = { label: name, stack: `'${name}',ui-monospace,monospace` };
+  }
+  return { ...vendored, ...detected };
+})();
 
 /** Ground, panel and text — the three a preset has to answer.
  *
@@ -779,15 +864,32 @@ export const PRESETS = {
   paper: { label: 'Paper', bg: '#F4F2ED', panel: '#EAE7E0', text: '#22201C' },
 };
 
-const THEME_DEF = { ...PRESETS.orchd, font: 'plex', custom: null };
+/** How opaque the ground is, when the window lets light through at all.
+ *
+ *  A theme value rather than a config one, unlike `window_transparent`: once the
+ *  window is see-through the page can change *how much* on every frame, so this
+ *  belongs beside the colours in `localStorage` and needs no restart. Floored well
+ *  above zero — a fully invisible board is not a theme, it is a lost window. */
+export const OPACITY = { min: 0.35, max: 1, step: 0.05, def: 0.9 };
 
-/** @type {{bg:string, panel:string, text:string, font:string, custom:string|null, label?:string}} */
+const THEME_DEF = { ...PRESETS.orchd, font: 'plex', custom: null, opacity: OPACITY.def };
+
+/** @type {{bg:string, panel:string, text:string, font:string, custom:string|null, opacity:number}} */
 export let theme = THEME_DEF;
 
 const themeListeners = [];
 export function onThemeChange(fn) { themeListeners.push(fn); }
 
 /* ---- colour arithmetic ---------------------------------------------------- */
+
+export const clampOpacity = (v) => {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return OPACITY.def;
+  /* Rounded, the way `setZoom` rounds its own: stepping by 0.05 accumulates
+     binary error, and this value is written to `localStorage` — so without it a
+     board that reads 60% stores `0.5999999999999998`. */
+  return Math.round(Math.min(OPACITY.max, Math.max(OPACITY.min, n)) * 100) / 100;
+};
 
 const hex = (v) => {
   const m = /^#?([0-9a-f]{6})$/i.exec(String(v || '').trim());
@@ -799,6 +901,12 @@ const rgb = (v) => {
 };
 const out = ([r, g, b]) =>
   '#' + [r, g, b].map((x) => Math.max(0, Math.min(255, Math.round(x))).toString(16).padStart(2, '0')).join('');
+
+/** A colour with an alpha, for the two surfaces that show the desktop through. */
+const alpha = (v, a) => {
+  const [r, g, b] = rgb(v);
+  return `rgba(${r}, ${g}, ${b}, ${a})`;
+};
 
 /** `t` of the way from `a` to `b`. */
 const mix = (a, b, t) => {
@@ -817,9 +925,20 @@ const mix = (a, b, t) => {
  *  the same instruction in both directions. */
 function tokens(t) {
   const { bg, panel, text } = t;
+  /* **The alpha goes on the two *surfaces*, never on `--bg`.** That token is used
+     eighteen other times in the sheet — input grounds, hover fills, a select's
+     background — and making it translucent would leave you reading a text field
+     through the desktop. So the window's ground and the panels get their own
+     tokens, and every component keeps a solid one.
+
+     Only when the window is actually see-through: with an opaque window an alpha
+     ground composites over Tauri's `background_color` and does nothing but cost a
+     blend, and the setting is disabled in the pane to say so. */
+  const see = TRANSPARENT && t.opacity < 1;
   return {
     '--bg': bg,
-    '--surface': panel,
+    '--ground': see ? alpha(bg, t.opacity) : bg,
+    '--surface': see ? alpha(panel, t.opacity) : panel,
     // A row you are on, and a row under the pointer one step below it. Off the
     // panel rather than the ground, because that is what they sit on.
     '--raised': mix(panel, text, 0.1),
@@ -858,8 +977,13 @@ export function fontStack(t = theme) {
 export function termColours(t = theme) {
   const { bg, text } = t;
   const on = (c, amount = 0.12) => mix(c, bg, amount);
+  const see = TRANSPARENT && t.opacity < 1;
   return {
-    background: bg,
+    /* The terminal is most of the window, so a see-through board that stopped at
+       the pane edges would not be see-through at all. Needs `allowTransparency`
+       on the `Terminal`, which is fixed at construction — hence `TRANSPARENT`
+       being told at boot rather than looked up. */
+    background: see ? alpha(bg, t.opacity) : bg,
     foreground: text,
     cursor: text,
     selectionBackground: mix(bg, text, 0.18),
@@ -888,8 +1012,11 @@ function loadTheme() {
       bg: hex(got.bg) ? got.bg : THEME_DEF.bg,
       panel: hex(got.panel) ? got.panel : THEME_DEF.panel,
       text: hex(got.text) ? got.text : THEME_DEF.text,
+      // A stored family that is no longer installed falls back rather than
+      // rendering as something else: the list is built from this machine.
       font: got.font === 'custom' || FONTS[got.font] ? got.font : THEME_DEF.font,
       custom: typeof got.custom === 'string' ? got.custom : null,
+      opacity: clampOpacity(got.opacity),
     };
   } catch {
     return THEME_DEF;
@@ -900,6 +1027,13 @@ function loadTheme() {
 function applyTheme(t) {
   const root = document.documentElement;
   for (const [k, v] of Object.entries(tokens(t))) root.style.setProperty(k, v);
+  /* `html` has to stop painting its own ground, or it sits opaque behind the
+     translucent `body` and nothing shows through. Set to `transparent` rather
+     than to the rgba value, so the two are not blended twice. */
+  if (TRANSPARENT && t.opacity < 1) {
+    root.style.background = 'transparent';
+    return;
+  }
   /* **`html` too, and not only the token.** `index.html` carries an inline
      `html,body{background:#101010}` so the window is not white while `app.css`
      parses, and Tauri paints the same value under the webview — both compiled in,
@@ -1295,9 +1429,6 @@ export async function newShell() {
 // and the daemon — running inside the desktop process — calls Tauri's window
 // API in Rust. No IPC bridge, so nothing here depends on which port we bound.
 export const CHROME = window.__ORCH__.chrome || 'none';
-
-/** Whether the daemon is running on macOS. Told, not sniffed. */
-export const IS_MAC = window.__ORCH__.platform === 'mac';
 
 /** The modifier the app's own chords wear: ⌘ on a Mac, Ctrl elsewhere. */
 export const MOD_LABEL = IS_MAC ? '⌘' : 'Ctrl';

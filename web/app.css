@@ -79,7 +79,12 @@
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
 body{
-  background:var(--bg);
+  /* **`--ground`, not `--bg`.** The window's own surface is the one thing that
+     carries the theme's alpha when `window_transparent` is on; `--bg` stays solid
+     because eighteen other rules use it for input grounds and hover fills, and a
+     text field you read the desktop through is not a feature. Falls back to
+     `--bg`, which is what it is on every opaque window. */
+  background:var(--ground,var(--bg));
   color:var(--text);font-family:var(--sans);font-size:calc(13px * var(--fs));line-height:1.5;
   -webkit-font-smoothing:antialiased;overflow:hidden;
 }
@@ -110,7 +115,7 @@ a{cursor:pointer}
 }
 .top{
   display:flex;align-items:center;gap:12px;padding:0 16px;flex-wrap:nowrap;
-  border-bottom:1px solid var(--line);background:var(--bg);min-width:0;
+  border-bottom:1px solid var(--line);background:var(--ground,var(--bg));min-width:0;
 }
 .top-l{border-right:1px solid var(--line);background:var(--surface)}
 .top-r{border-left:1px solid var(--line);background:var(--surface)}
@@ -441,7 +446,12 @@ button.ctx-btn:hover{color:var(--text)}
 }
 
 /* ---------- center ---------- */
-.center{display:flex;flex-direction:column;min-width:0;background:var(--bg);position:relative}
+/* **`--ground`, and this is the one that matters most.** The centre pane is the
+   largest surface in the window, so an opaque fill here made a transparent window
+   see-through everywhere except the part you look at. The rail, the changed-files
+   pane and the drawer already ride on `--surface`, which carries the alpha too;
+   `.settings` and `.overlay` deliberately do not — see their own rules. */
+.center{display:flex;flex-direction:column;min-width:0;background:var(--ground,var(--bg));position:relative}
 .termwrap{flex:1;min-height:0;position:relative;padding:8px 6px 8px 12px}
 .termhost{position:absolute;inset:8px 6px 8px 12px;transition:opacity .35s ease}
 .termhost[hidden]{display:none}
@@ -788,6 +798,11 @@ body.row-resizing{cursor:row-resize;user-select:none}
 /* The centre column, the way the diff overlay takes it: settings is a place you
    go, not a dialog floating over the whole window, and covering the context bar
    keeps its close button from sitting next to the session's own. */
+/* **Opaque on purpose, even with a transparent window.** `--bg` rather than
+   `--ground`: this covers the board so a form can be read, and a form you read the
+   desktop through is the readability problem transparency causes rather than the
+   effect it is for. The line is the same for `.overlay`: the board is
+   see-through, the things that cover it to be read are not. */
 .settings{
   position:fixed;top:0;bottom:0;left:var(--rail);right:var(--files);z-index:20;
   display:flex;flex-direction:column;background:var(--bg);
@@ -1164,6 +1179,7 @@ select.settings-in option{color:var(--text);background-color:var(--bg)}
    above the overlay's Close: two buttons, a few pixels apart, one of which
    throws away a conversation. Held below the column splitters (60), which stay
    draggable with a file open. */
+/* Opaque, for the reason `.settings` gives: a diff is for reading. */
 .overlay{
   position:fixed;top:0;bottom:0;left:var(--rail);right:var(--files);
   background:var(--bg);z-index:20;
