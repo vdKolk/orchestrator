@@ -245,16 +245,30 @@
          mixed from them (`core.js`, `tokens`). The semantic colours — amber for
          "needs you", red for a failed build — are deliberately not offered: they
          are a legend three panes read, not decoration. -->
+    <!-- **Two fixed slots per row: the control, then the reset.** Every control in
+         this group has to end at the same x or the column reads as ragged, and it
+         did: a `.settings-step` sized to its contents put the selects, the colour
+         wells and the steppers on four different left edges, and the rows carrying
+         a Reset ended 44px short of the rows without one. `.settings-ctl` is a
+         fixed-width right-aligned box and `.settings-reset` is a reserved slot —
+         empty where there is nothing to reset, so it still holds the column. -->
     <div class="settings-row">
       <span class="settings-k">Theme</span>
       <span class="settings-step">
-        <select class="settings-in" id="thpreset" title="A starting point to adjust from"></select>
+        <span class="settings-ctl">
+          <select class="settings-in" id="thpreset" title="A starting point to adjust from"></select>
+        </span>
+        <!-- The whole theme's reset, on the row that names it. -->
+        <button class="settings-reset" id="threset" type="button">Reset</button>
       </span>
     </div>
     <div class="settings-row">
       <span class="settings-k">Font</span>
       <span class="settings-step">
-        <select class="settings-in" id="thfont"></select>
+        <span class="settings-ctl">
+          <select class="settings-in" id="thfont"></select>
+        </span>
+        <span class="settings-reset"></span>
       </span>
     </div>
     <!-- Only for `custom`: the vendored faces ship with the app, and a family the
@@ -264,16 +278,22 @@
         <span class="settings-hint">as installed</span>
       </span>
       <span class="settings-step">
-        <input class="settings-in" id="thcustom" type="text" spellcheck="false"
-               placeholder="SF Mono" autocomplete="off">
+        <span class="settings-ctl">
+          <input class="settings-in" id="thcustom" type="text" spellcheck="false"
+                 placeholder="SF Mono" autocomplete="off">
+        </span>
+        <span class="settings-reset"></span>
       </span>
     </div>
     <div class="settings-row">
       <span class="settings-k">Background</span>
       <span class="settings-step">
-        <input class="settings-col" id="thbg" type="color">
-        <input class="settings-in settings-in-hex" id="thbghex" type="text"
-               spellcheck="false" autocomplete="off" maxlength="7">
+        <span class="settings-ctl">
+          <input class="settings-col" id="thbg" type="color" aria-label="Background colour">
+          <input class="settings-in settings-in-hex" id="thbghex" type="text"
+                 spellcheck="false" autocomplete="off" maxlength="7" aria-label="Background hex">
+        </span>
+        <span class="settings-reset"></span>
       </span>
     </div>
     <div class="settings-row">
@@ -281,27 +301,34 @@
         <span class="settings-hint">rail, headers</span>
       </span>
       <span class="settings-step">
-        <input class="settings-col" id="thpanel" type="color">
-        <input class="settings-in settings-in-hex" id="thpanelhex" type="text"
-               spellcheck="false" autocomplete="off" maxlength="7">
+        <span class="settings-ctl">
+          <input class="settings-col" id="thpanel" type="color" aria-label="Panel colour">
+          <input class="settings-in settings-in-hex" id="thpanelhex" type="text"
+                 spellcheck="false" autocomplete="off" maxlength="7" aria-label="Panel hex">
+        </span>
+        <span class="settings-reset"></span>
       </span>
     </div>
     <div class="settings-row">
       <span class="settings-k">Text</span>
       <span class="settings-step">
-        <input class="settings-col" id="thtext" type="color">
-        <input class="settings-in settings-in-hex" id="thtexthex" type="text"
-               spellcheck="false" autocomplete="off" maxlength="7">
-        <button class="settings-reset" id="threset" type="button">Reset</button>
+        <span class="settings-ctl">
+          <input class="settings-col" id="thtext" type="color" aria-label="Text colour">
+          <input class="settings-in settings-in-hex" id="thtexthex" type="text"
+                 spellcheck="false" autocomplete="off" maxlength="7" aria-label="Text hex">
+        </span>
+        <span class="settings-reset"></span>
       </span>
     </div>
 
     <div class="settings-row">
       <span class="settings-k">Font size</span>
       <span class="settings-step">
-        <button class="stepbtn" id="fsdown" title="Smaller">&#8722;</button>
-        <span class="stepval" id="fsval">100%</span>
-        <button class="stepbtn" id="fsup" title="Bigger">+</button>
+        <span class="settings-ctl">
+          <button class="stepbtn" id="fsdown" title="Smaller">&#8722;</button>
+          <span class="stepval" id="fsval">100%</span>
+          <button class="stepbtn" id="fsup" title="Bigger">+</button>
+        </span>
         <button class="settings-reset" id="fsreset" type="button">Reset</button>
       </span>
     </div>
@@ -315,9 +342,11 @@
         <span class="settings-hint">agent panes</span>
       </span>
       <span class="settings-step">
-        <button class="stepbtn" id="wsdown" title="Slower">&#8722;</button>
-        <span class="stepval" id="wsval">100%</span>
-        <button class="stepbtn" id="wsup" title="Faster">+</button>
+        <span class="settings-ctl">
+          <button class="stepbtn" id="wsdown" title="Slower">&#8722;</button>
+          <span class="stepval" id="wsval">100%</span>
+          <button class="stepbtn" id="wsup" title="Faster">+</button>
+        </span>
         <button class="settings-reset" id="wsreset" type="button">Reset</button>
       </span>
     </div>

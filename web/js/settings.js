@@ -88,6 +88,10 @@ function setupTheme() {
     };
   }
 
+  /* Says what it takes with it. It sits on the Theme row because that is the row
+     that names the thing, but it puts the *font* back too — and a Reset on one row
+     quietly changing another is the kind of surprise a tooltip is for. */
+  $('threset').title = 'Back to the colours and font the app shipped with';
   $('threset').onclick = () => applyAndShow({ ...PRESETS.orchd, font: 'plex', custom: null });
   showTheme();
 }

@@ -886,7 +886,26 @@ body.row-resizing{cursor:row-resize;user-select:none}
 /* Which panes a setting reaches, where that is not obvious from its name. Dimmer
    and smaller than the key it qualifies, so the row still reads as one label. */
 .settings-hint{color:var(--faint-solid);font-size:calc(9.5px * var(--fs))}
-.settings-step{margin-left:auto;display:flex;align-items:center;gap:2px}
+/* **The control column, and why it is fixed rather than fitted.** Right-aligned
+   with `margin-left:auto` and then two slots of known width: a select sizes to
+   its longest option, a colour well plus a hex field is a different width again,
+   and a stepper a third — so a step that fitted its contents put four rows on
+   four left edges. Measured before this: 326, 358, 384 and 402, with the rows
+   carrying a Reset ending 44px short of the rows without one.
+
+   `align-items:center` on the row already centres these vertically; what was
+   missing was any agreement about the horizontal. */
+.settings-step{margin-left:auto;display:flex;align-items:center;gap:8px}
+/* The control itself, right-aligned inside a fixed box so every row's ends at
+   the same x whatever it holds. 152px is the widest thing that has to fit — a
+   stepper at 24+44+24 plus its gaps — with room for the longest preset name. */
+.settings-ctl{
+  flex:0 0 152px;display:flex;align-items:center;justify-content:flex-end;gap:2px;min-width:0;
+}
+/* A reserved slot, present in every row of the group even when it holds nothing:
+   that is what keeps the control column's right edge honest. Right-aligned so the
+   word sits against the card's edge rather than floating in its box. */
+.settings-reset{flex:0 0 46px;text-align:right}
 .stepbtn{
   width:24px;height:24px;border-radius:2px;border:1px solid var(--line);
   font-family:var(--mono);font-size:calc(11.5px * var(--fs));line-height:1;color:var(--dim);
@@ -902,9 +921,10 @@ body.row-resizing{cursor:row-resize;user-select:none}
    read as the *name* of the setting below it: "Reset to 100%" sat directly above
    "Wheel speed" and looked like its label. */
 .settings-reset{
-  margin-left:6px;
   font-family:var(--mono);font-size:calc(10.5px * var(--fs));color:var(--faint-solid);
 }
+/* An empty slot is not something to hover or tab to. */
+.settings-reset:empty{pointer-events:none}
 .settings-reset:hover{color:var(--text)}
 /* Quieter than the controls beside it: it is information, not something to press. */
 .settings-ver{
@@ -918,9 +938,13 @@ body.row-resizing{cursor:row-resize;user-select:none}
 .settings-field{display:flex;align-items:center;gap:12px;margin-top:18px}
 .settings-in{
   margin-left:auto;flex:0 1 62%;min-width:0;padding:4px 8px;
+  /* Inside the appearance column the box owns the width; `62%` of the row is for
+     the wide fields further down (Upstream ref, Output language), which have no
+     control column to line up with. */
   background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:2px;
   font-family:var(--mono);font-size:calc(11.5px * var(--fs));
 }
+.settings-ctl > .settings-in{margin-left:0;flex:1}
 .settings-in:focus{outline:none;border-color:var(--focus)}
 /* A checkbox in a settings row: pushed right like `.settings-in`, but never
    stretched to its 62% width. */
@@ -929,7 +953,10 @@ body.row-resizing{cursor:row-resize;user-select:none}
    on a dark card WebKitGTK renders black-on-black. The option list is drawn by
    the OS and needs telling separately. */
 select.settings-in{
-  flex:0 0 auto;color:var(--text);background-color:var(--bg);
+  /* `flex:1` inside `.settings-ctl`, not `0 0 auto`: sized to its own longest
+     option, the Theme and Font dropdowns came out two different widths one under
+     the other. The box decides now, so they agree. */
+  flex:1;min-width:0;color:var(--text);background-color:var(--bg);
   /* The value shown when the list is closed is painted by the platform unless
      the native appearance is gone entirely, which is why setting `color` alone
      left it black on black under WebKitGTK. */
@@ -951,8 +978,10 @@ select.settings-in option{color:var(--text);background-color:var(--bg)}
 }
 .settings-col::-webkit-color-swatch-wrapper{padding:2px}
 .settings-col::-webkit-color-swatch{border:0;border-radius:1px}
-/* Narrow: it holds seven characters and never needs the 62% a text field takes. */
-.settings-in-hex{flex:0 0 8ch;margin-left:0;text-align:center}
+/* Fills what the swatch leaves rather than claiming a width of its own: `#101010`
+   is seven characters and the box is already the right size, so a fixed `8ch` here
+   only moved the pair off the column's edge. */
+.settings-in-hex{flex:1;min-width:0;margin-left:6px;text-align:center}
 /* What a field is for, under the field rather than in a tooltip nobody hovers. */
 .settings-help{
   margin:4px 0 0;padding-left:2px;max-width:62ch;
